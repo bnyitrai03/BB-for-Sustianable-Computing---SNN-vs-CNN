@@ -10,17 +10,25 @@ By benchmarking these two approaches, we seek to demonstrate the event-driven ad
 
 ## 🔄 Workflow
 
-**Dataset:** MNIST
+**Dataset:** CIFAR10
 
-1. **Traditional CNN:** ResNet18 https://colab.research.google.com/drive/1cekVU2BJi0QA2lDNHtmvd82CJzEHD3pw#scrollTo=107b9adb 
-3. **SNN:**
+1. **Traditional CNN:** ResNet18 https://colab.research.google.com/drive/1cekVU2BJi0QA2lDNHtmvd82CJzEHD3pw#scrollTo=107b9adb
+
+Create visualization: 
+```bash
+carbonboard --filepath="emissions.csv" --port=3333
+```
+
+![carbon_equivalent](carbon_equivalent.png)
+
+2. **SNN:**
 
 ## ⚡ Energy Comparison Methodology
 
-Since we do not have direct access to neuromorphic hardware (e.g., Loihi, TrueNorth), we will estimate power consumption theoretically.
 
 ## 🛠️ Tech Stack \& Tools
 
 * **Language:** Python
 * **Deep Learning Framework:** [PyTorch](https://pytorch.org/)
+* **CNN Energy Monitor:** [codecarbon](https://github.com/mlco2/codecarbon)
 * **SNN Library:** [snnTorch](https://github.com/jeshraghian/snntorch)
