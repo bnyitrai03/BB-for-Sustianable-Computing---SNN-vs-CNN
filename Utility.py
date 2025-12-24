@@ -214,5 +214,126 @@ def plot_spike_rate_analysis(spike_rate_results, config, fixed_T=4):
     plt.show()
 
 
+def generate_summary_report(T_results, spike_rate_results, config):
+    """Generate text summary report"""
+    
+    report_path = os.path.join(config.exp_dir, 'experiment_summary.txt')
+    
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write("="*80 + "\n")
+        f.write("EXPERIMENT SUMMARY REPORT\n")
+        f.write("="*80 + "\n\n")
+        
+        f.write("EXPERIMENT CONFIGURATION:\n")
+        f.write("-"*40 + "\n")
+        f.write(f"T values tested: {config.T_values}\n")
+        f.write(f"Spike rates tested: {config.spike_rates}\n")
+        f.write(f"Training epochs: {config.epochs}\n\n")
+        
+        f.write("MODEL ARCHITECTURE:\n")
+        f.write("-"*40 + "\n")
+        f.write("Both models: ResNet-18\n")
+        f.write("Input: CIFAR-10 (32x32 RGB)\n")
+        f.write("Output: 10 classes\n\n")
+        
+        f.write("RESULTS BY T VALUE:\n")
+        f.write("-"*40 + "\n")
+        
+        for T in sorted(T_results.keys()):
+            res = T_results[T]
+            f.write(f"\nT = {T} (QNN bits = {res['qnn_bits']}):\n")
+            f.write(f"  SNN Accuracy: {res['snn_results']['test_accs'][-1]:.2f}%\n")
+            f.write(f"  QNN Accuracy: {res['qnn_results']['test_accs'][-1]:.2f}%\n")
+            f.write(f"  SNN Energy: {res['snn_energy']['energy_per_sample_j']*1e6:.2f} uJ\n")
+            f.write(f"  QNN Energy: {res['qnn_energy']['energy_per_sample_j']*1e6:.2f} uJ\n")
+            f.write(f"  Energy Ratio (SNN/QNN): {res['snn_energy']['energy_per_sample_j']/res['qnn_energy']['energy_per_sample_j']:.3f}\n")
+            
+            if res['paper_analysis']['condition'] is not None:
+                condition = "✓ Holds" if res['paper_analysis']['condition'] else "✗ Fails"
+                f.write(f"  Paper's condition: {condition}\n")
+        
+        f.write("\n" + "="*80 + "\n")
+        f.write("KEY FINDINGS:\n")
+        f.write("="*80 + "\n")
+        
+        # Find best SNN configuration
+        best_snn_T = None
+        best_snn_energy_ratio = float('inf')
+        
+        for T, res in T_results.items():
+            energy_ratio = res['snn_energy']['energy_per_sample_j'] / res['qnn_energy']['energy_per_sample_j']
+            if energy_ratio < best_snn_energy_ratio:
+                best_snn_energy_ratio = energy_ratio
+                best_snn_T = T
+        
+        if best_snn_T is not None:
+            f.write(f"\n1. Most energy-efficient SNN: T={best_snn_T}\n")
+            f.write(f"   Energy savings: {(1-best_snn_energy_ratio)*100:.1f}% vs equivalent QNN\n")
+        
+        # Check paper's condition
+        f.write("\n2. Paper's Condition Analysis:\n")
+        for T, res in T_results.items():
+            if res['paper_analysis']['condition'] is not None:
+                condition = "Holds" if res['paper_analysis']['condition'] else "Fails"
+                f.write(f"   T={T}: Condition {condition} ")
+                if res['paper_analysis']['condition']:
+                    f.write("(SNN should be efficient)\n")
+                else:
+                    f.write("(QNN should be efficient)\n")
+        
+        f.write("\n3. Spike Rate Observations:\n")
+        for T, res in T_results.items():
+            if res['paper_analysis']['spike_rate']:
+                s_r = res['paper_analysis']['spike_rate']
+                f.write(f"   T={T}: s_r={s_r:.4f}, T×s_r={T*s_r:.4f}\n")
+        
+        f.write("\n4. Practical Recommendations:\n")
+        f.write("   - For mobile edge devices, consider T ≤ 4 for SNNs\n")
+        f.write("   - Maintain spike rate s_r < 10% for energy efficiency\n")
+        f.write("   - Use QNN when high precision needed (8-bit or more)\n")
+        f.write("   - Use SNN for ultra-low-power applications\n")
+    
+    print(f"Summary report saved: {report_path}")
+
+
+# ============================================================================
+#                          MODEL ANALYSIS FUNCTIONS
+# ============================================================================
+
+def count_model_params(model):
+    """Count total parameters in model"""
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    return {
+        'total_params': total_params,
+        'trainable_params': trainable_params,
+        'total_params_m': total_params / 1e6,
+        'model_size_mb': (total_params * 4) / (1024**2)  # FP32 size
+    }
+
+def print_model_summary(model, model_name):
+    """Print detailed model summary"""
+    print(f"\n{'='*60}")
+    print(f"MODEL SUMMARY: {model_name}")
+    print(f"{'='*60}")
+    
+    params_info = count_model_params(model)
+    print(f"Total parameters: {params_info['total_params']:,}")
+    print(f"Trainable parameters: {params_info['trainable_params']:,}")
+    print(f"Model size (FP32): {params_info['model_size_mb']:.2f} MB")
+    
+    # Layer-wise breakdown
+    print(f"\n{'Layer':<25} {'Parameters':<15} {'Shape':<20}")
+    print(f"{'-'*60}")
+    
+    for name, param in model.named_parameters():
+        if 'weight' in name or 'bias' in name:
+            print(f"{name:<25} {param.numel():<15,} {str(tuple(param.shape)):<20}")
+    
+    return params_info
+
+
+
 
 
